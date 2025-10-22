@@ -71,8 +71,8 @@ Docker가 없다면:
 - Anthropic API 키 (https://console.anthropic.com/settings/keys)
 - Perplexity API 키 (https://www.perplexity.ai/settings/api)
 - Firecrawl API 키 (https://www.firecrawl.dev/)
-- Telegram Bot Token ([@BotFather](https://t.me/BotFather)에서 발급)
-- Telegram Channel ID
+- Slack Bot Token (https://api.slack.com/apps 에서 발급)
+- Slack Channel ID (`SLACK_CHANNEL_ID`)
 
 ---
 
@@ -171,10 +171,11 @@ docker exec -it prism-insight-container /bin/bash
 
 #### 1. `.env` 파일
 ```bash
-TELEGRAM_BOT_TOKEN=여기에_봇_토큰_입력
-TELEGRAM_AI_BOT_TOKEN=여기에_AI봇_토큰_입력
-TELEGRAM_CHANNEL_ID=@여기에_채널ID_입력
+SLACK_BOT_TOKEN=xoxb-여기에_봇_토큰_입력
+SLACK_CHANNEL_ID=C여기에_채널ID_입력
 ```
+
+> ⚠️ **Migration Note**: Telegram 기반 스크립트(`run_telegram_pipeline.py`, `telegram_bot_agent.py`, `telegram_summary_agent.py` 등)는 하위 호환용으로만 남아 있으며 더 이상 유지보수되지 않습니다. Docker 환경에서도 Slack 파이프라인(`run_slack_pipeline.py`, `slack_summary_agent.py`, `slack_bot_agent.py`)을 사용하세요.
 
 #### 2. `mcp_agent.config.yaml` 파일
 ```yaml
@@ -357,6 +358,9 @@ python3 stock_analysis_orchestrator.py --mode afternoon
 
 # 오전 + 오후 모두
 python3 stock_analysis_orchestrator.py --mode both
+
+# Slack 요약/전송 파이프라인 (당일 보고서)
+python3 run_slack_pipeline.py --all --today
 ```
 
 ### Crontab 자동화 설정
@@ -494,7 +498,7 @@ sudo chown -R $USER:$USER data reports pdf_reports
 ## 📞 지원
 
 - **프로젝트**: https://github.com/dragon1086/prism-insight
-- **텔레그램**: https://t.me/stock_ai_agent
+- **Slack**: https://prism-insight.slack.com/archives/C01MARKETAI
 - **이슈**: https://github.com/dragon1086/prism-insight/issues
 
 ---

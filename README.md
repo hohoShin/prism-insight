@@ -13,13 +13,11 @@
 # 🔍 PRISM-INSIGHT
 
 AI 기반 주식 분석 및 매매 시스템
-- **[공식 텔레그램 채널](https://t.me/stock_ai_agent)**: 급등주 포착/주식 분석 리포트 다운로드/매매 시뮬레이션/자동매매 리포트 제공 (https://t.me/stock_ai_agent)
-- **커뮤니티**: 아직 없음. 임시로 텔레그램 채널 토론방에서 대화 가능
 
 
 ## 📖 프로젝트 개요
 
-PRISM-INSIGHT는 **AI 분석 에이전트를 활용한 종합 주식 분석**을 핵심으로 하는 **완전 오픈소스 무료 프로젝트**입니다. 텔레그램 채널을 통해 매일 급등주를 자동으로 포착하고, 전문가 수준의 애널리스트 리포트를 생성하여 매매 시뮬레이션 및 자동매매를 수행합니다.
+PRISM-INSIGHT는 **AI 분석 에이전트를 활용한 종합 주식 분석**을 핵심으로 하는 **완전 오픈소스 무료 프로젝트**입니다. Slack 통합을 통해 매일 급등주를 자동으로 포착하고, 전문가 수준의 애널리스트 리포트를 생성하여 매매 시뮬레이션 및 자동매매를 수행합니다.
 
 **✨ 모든 기능이 100% 무료로 제공됩니다!**
 
@@ -128,9 +126,9 @@ PRISM-INSIGHT는 **12개의 전문화된 AI 에이전트들이 협업하는 다�
 
 - **역할**: 상세 보고서를 투자자를 위한 핵심 요약으로 변환
 - **특징**:
-  - 400자 내외의 간결한 텔레그램 메시지 생성
+  - 400자 내외의 간결한 Slack 메시지 생성
   - 핵심 정보와 투자 포인트 추출
-  - 텔레그램 최적화 포맷팅
+  - Slack 최적화 포맷팅 (mrkdwn)
 
 #### 8-2. 품질 검수자 (Quality Inspector)
 <img src="docs/images/aiagent/quality_inspector.jpeg" alt="Quality Inspector" width="300"/>
@@ -208,7 +206,7 @@ PRISM-INSIGHT는 **12개의 전문화된 AI 에이전트들이 협업하는 다�
   <img src="docs/images/trigger.png" alt="급등주 포착" width="500">
 
 
-- **📱 텔레그램 자동 전송**: 분석 결과를 텔레그램 채널로 실시간 전송
+- **📱 Slack 자동 전송**: 분석 결과를 설정된 Slack 채널로 mrkdwn 포맷팅해 실시간 공유
   <img src="docs/images/summary.png" alt="요약 전송" width="500">
 
 
@@ -227,7 +225,7 @@ PRISM-INSIGHT는 **12개의 전문화된 AI 에이전트들이 협업하는 다�
 
 - **핵심 분석**: OpenAI GPT-4.1 (종합 주식 분석 에이전트)
 - **매매 시뮬레이션**: OpenAI GPT-5 (투자 전략 시뮬레이션)
-- **텔레그램 대화**: Anthropic Claude Sonnet 4.5 (봇과의 상호작용)
+- **Slack 알림**: Anthropic Claude Sonnet 4.5 (봇과의 상호작용)
 
 ## 💡 사용한 MCP Servers
 
@@ -245,7 +243,7 @@ PRISM-INSIGHT는 **12개의 전문화된 AI 에이전트들이 협업하는 다�
 - Python 3.10+
 - OpenAI API 키 (GPT-4.1, GPT-5)
 - Anthropic API 키 (Claude-Sonnet-4.5)
-- 텔레그램 봇 토큰 및 채널 ID
+- Slack Bot Token 및 채널 ID (`SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`)
 - wkhtmltopdf (PDF 변환용)
 - 한국투자증권 API 관련 앱키 및 시크릿키
 
@@ -331,6 +329,7 @@ utils/setup_crontab.sh
 프로젝트 실행을 위해 다음 4개 설정 파일을 반드시 구성해야 합니다:
 
 - **`.env`**: 환경 변수 (API 키, 토큰 등)
+  - 예: `OPENAI_API_KEY`, `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID`, `FIRECRAWL_API_KEY`
 - **`./examples/streamlit/config.py`**: 보고서 생성 웹 설정
 - **`mcp_agent.config.yaml`**: MCP 에이전트 설정
 - **`mcp_agent.secrets.yaml`**: MCP 에이전트 시크릿 정보
@@ -339,7 +338,7 @@ utils/setup_crontab.sh
 
 ### 기본 실행
 
-전체 파이프라인을 실행하여 급등주 분석부터 텔레그램 전송까지 자동화:
+전체 파이프라인을 실행하여 급등주 분석부터 Slack 전송까지 자동화:
 
 ```bash
 # 오전 + 오후 모두 실행
@@ -350,6 +349,12 @@ python stock_analysis_orchestrator.py --mode morning
 
 # 오후만 실행
 python stock_analysis_orchestrator.py --mode afternoon
+```
+
+Slack 요약/전송 파이프라인만 실행하려면:
+
+```bash
+python run_slack_pipeline.py --all --today
 ```
 
 ### 개별 모듈 실행
@@ -370,10 +375,10 @@ python cores/main.py
 python pdf_converter.py input.md output.pdf
 ```
 
-**4. 텔레그램 메시지 생성 및 전송**
+**4. Slack 메시지 생성 및 전송**
 ```bash
-python telegram_summary_agent.py
-python telegram_bot_agent.py
+python slack_summary_agent.py
+python slack_bot_agent.py
 ```
 
 ## 📁 프로젝트 구조
@@ -394,7 +399,7 @@ prism-insight/
 ├── 📂 trading/                   # 💱 자동매매 시스템 (한국투자증권 API)
 │   ├── kis_auth.py              # KIS API 인증 및 토큰 관리
 │   ├── domestic_stock_trading.py # 국내주식 매매 핵심 모듈
-│   ├── portfolio_telegram_reporter.py # 포트폴리오 텔레그램 리포터
+│   ├── portfolio_slack_reporter.py # 포트폴리오 Slack 리포터
 │   ├── 📂 config/               # 설정 파일 디렉토리
 │   │   ├── kis_devlp.yaml       # KIS API 설정 (앱키, 계좌번호 등)
 │   │   └── kis_devlp.yaml.example # 설정 파일 예시
@@ -403,7 +408,8 @@ prism-insight/
 ├── 📂 tests/                     # 테스트 코드
 ├── stock_analysis_orchestrator.py # 🎯 메인 오케스트레이터
 ├── trigger_batch.py             # 급등주 포착 배치
-├── telegram_bot_agent.py        # 텔레그램 봇 (Claude 기반)
+├── slack_bot_agent.py          # Slack 봇 (Claude 기반)
+├── slack_summary_agent.py      # Slack 요약 에이전트
 ├── stock_tracking_agent.py      # 매매 시뮬레이션 (GPT-5)
 ├── stock_tracking_enhanced_agent.py # 향상된 매매 시뮬레이션
 ├── pdf_converter.py             # PDF 변환
@@ -412,6 +418,8 @@ prism-insight/
 ├── mcp_agent.config.yaml.example    # MCP 에이전트 설정 예시
 └── mcp_agent.secrets.yaml.example   # MCP 에이전트 시크릿 예시
 ```
+
+> ⚠️ **Migration Note**: 기존 Telegram 스크립트(`run_telegram_pipeline.py`, `telegram_bot_agent.py`, `telegram_summary_agent.py` 등)는 하위 호환을 위해 리포지토리에 남아 있으나 더 이상 유지보수되지 않습니다. 최신 배포에서는 Slack 파이프라인(`run_slack_pipeline.py`, `slack_summary_agent.py`, `slack_bot_agent.py`)을 사용하세요.
 
 ## 📈 분석 보고서 구성
 
