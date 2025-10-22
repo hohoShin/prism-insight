@@ -9,7 +9,8 @@ email-validator
 openai~=1.64.0
 anthropic~=0.64.0
 markdown>=3.3.0
-python-telegram-bot>=20.0
+slack-sdk>=3.27.0
+slack-bolt>=1.18.0
 aiosqlite>=0.17.0
 mcp-server-sqlite
 
@@ -40,7 +41,7 @@ Pillow>=10.0.0
 
 holidays~=0.68
 
-python-telegram-bot[job-queue]>=20.0
+# Removed: python-telegram-bot (migrated to Slack)
 
 kospi_kosdaq_stock_server>=0.2.1
 DateTime~=5.5

@@ -23,8 +23,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 
-from telegram import Bot
-from telegram.error import TelegramError
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 # 로깅 설정
 logging.basicConfig(
@@ -64,26 +64,26 @@ class StockTrackingAgent:
     SCORE_CONSIDER = 7  # 매수 고려
     SCORE_UNSUITABLE = 6  # 매수 부적합
 
-    def __init__(self, db_path: str = "stock_tracking_db.sqlite", telegram_token: str = None):
+    def __init__(self, db_path: str = "stock_tracking_db.sqlite", slack_token: str = None):
         """
         에이전트 초기화
 
         Args:
             db_path: SQLite 데이터베이스 파일 경로
-            telegram_token: 텔레그램 봇 토큰
+            slack_token: Slack 봇 토큰
         """
         self.max_slots = self.MAX_SLOTS
-        self.message_queue = []  # 텔레그램 메시지 저장용
+        self.message_queue = []  # Slack 메시지 저장용
         self.trading_agent = None
         self.db_path = db_path
         self.conn = None
         self.cursor = None
 
-        # 텔레그램 봇 토큰 설정
-        self.telegram_token = telegram_token or os.environ.get("TELEGRAM_BOT_TOKEN")
-        self.telegram_bot = None
-        if self.telegram_token:
-            self.telegram_bot = Bot(token=self.telegram_token)
+        # Slack 봇 토큰 설정
+        self.slack_token = slack_token or os.environ.get("SLACK_BOT_TOKEN")
+        self.slack_client = None
+        if self.slack_token:
+            self.slack_client = WebClient(token=self.slack_token)
 
     async def initialize(self):
         """필요한 테이블 생성 및 초기화"""
@@ -1503,24 +1503,24 @@ class StockTrackingAgent:
             logger.error(traceback.format_exc())
             return 0, 0
 
-    async def send_telegram_message(self, chat_id: str) -> bool:
+    async def send_slack_message(self, channel_id: str) -> bool:
         """
-        텔레그램으로 메시지 전송
+        Slack으로 메시지 전송
 
         Args:
-            chat_id: 텔레그램 채널 ID
+            channel_id: Slack 채널 ID
 
         Returns:
             bool: 전송 성공 여부
         """
         try:
-            # 텔레그램 봇이 초기화되지 않았다면 로그만 출력
-            if not self.telegram_bot:
-                logger.warning("텔레그램 봇이 초기화되지 않았습니다. 토큰을 확인해주세요.")
+            # Slack 클라이언트가 초기화되지 않았다면 로그만 출력
+            if not self.slack_client:
+                logger.warning("Slack 클라이언트가 초기화되지 않았습니다. 토큰을 확인해주세요.")
 
                 # 메시지 출력만 하고 실제 전송은 하지 않음
                 for message in self.message_queue:
-                    logger.info(f"[텔레그램 메시지] {message[:100]}...")
+                    logger.info(f"[Slack 메시지] {message[:100]}...")
 
                 return False
 
@@ -1531,22 +1531,27 @@ class StockTrackingAgent:
             # 각 메시지 전송
             success = True
             for message in self.message_queue:
-                logger.info(f"텔레그램 메시지 전송 중: {chat_id}")
+                logger.info(f"Slack 메시지 전송 중: {channel_id}")
                 try:
-                    # 텔레그램 메시지 길이 제한 (4096자)
-                    MAX_MESSAGE_LENGTH = 4096
-                    
+                    # Slack 메시지 길이 제한 (40000자)
+                    MAX_MESSAGE_LENGTH = 40000
+
                     if len(message) <= MAX_MESSAGE_LENGTH:
                         # 메시지가 짧으면 한 번에 전송
-                        await self.telegram_bot.send_message(
-                            chat_id=chat_id,
-                            text=message
+                        response = self.slack_client.chat_postMessage(
+                            channel=channel_id,
+                            text=message,
+                            mrkdwn=True
                         )
+
+                        if not response["ok"]:
+                            logger.error(f"Slack 메시지 전송 실패: {response.get('error', 'Unknown error')}")
+                            success = False
                     else:
                         # 메시지가 길면 분할 전송
                         parts = []
                         current_part = ""
-                        
+
                         for line in message.split('\n'):
                             if len(current_part) + len(line) + 1 <= MAX_MESSAGE_LENGTH:
                                 current_part += line + '\n'
@@ -1554,21 +1559,27 @@ class StockTrackingAgent:
                                 if current_part:
                                     parts.append(current_part.rstrip())
                                 current_part = line + '\n'
-                        
+
                         if current_part:
                             parts.append(current_part.rstrip())
-                        
+
                         # 분할된 메시지 전송
                         for i, part in enumerate(parts, 1):
-                            await self.telegram_bot.send_message(
-                                chat_id=chat_id,
-                                text=f"[{i}/{len(parts)}]\n{part}"
+                            response = self.slack_client.chat_postMessage(
+                                channel=channel_id,
+                                text=f"[{i}/{len(parts)}]\n{part}",
+                                mrkdwn=True
                             )
+
+                            if not response["ok"]:
+                                logger.error(f"Slack 메시지 전송 실패: {response.get('error', 'Unknown error')}")
+                                success = False
+
                             await asyncio.sleep(0.5)  # 분할 메시지 간 짧은 지연
-                    
-                    logger.info(f"텔레그램 메시지 전송 완료: {chat_id}")
-                except TelegramError as e:
-                    logger.error(f"텔레그램 메시지 전송 실패: {e}")
+
+                    logger.info(f"Slack 메시지 전송 완료: {channel_id}")
+                except SlackApiError as e:
+                    logger.error(f"Slack 메시지 전송 실패: {e.response['error']}")
                     success = False
 
                 # API 제한 방지를 위한 지연
@@ -1605,13 +1616,13 @@ class StockTrackingAgent:
                 # 보고서 처리
                 buy_count, sell_count = await self.process_reports(pdf_report_paths)
 
-                # 텔레그램 메시지 전송
+                # Slack 메시지 전송
                 if chat_id:
-                    message_sent = await self.send_telegram_message(chat_id)
+                    message_sent = await self.send_slack_message(chat_id)
                     if message_sent:
-                        logger.info("텔레그램 메시지 전송 완료")
+                        logger.info("Slack 메시지 전송 완료")
                     else:
-                        logger.warning("텔레그램 메시지 전송 실패")
+                        logger.warning("Slack 메시지 전송 실패")
 
                 logger.info("트래킹 시스템 배치 실행 완료")
                 return True
@@ -1645,8 +1656,8 @@ async def main():
 
     parser = argparse.ArgumentParser(description="주식 트래킹 및 매매 에이전트")
     parser.add_argument("--reports", nargs="+", help="분석 보고서 파일 경로 리스트")
-    parser.add_argument("--chat-id", help="텔레그램 채널 ID")
-    parser.add_argument("--telegram-token", help="텔레그램 봇 토큰")
+    parser.add_argument("--channel-id", help="Slack 채널 ID")
+    parser.add_argument("--slack-token", help="Slack 봇 토큰")
 
     args = parser.parse_args()
 
@@ -1655,8 +1666,8 @@ async def main():
         return False
 
     async with app.run():
-        agent = StockTrackingAgent(telegram_token=args.telegram_token)
-        success = await agent.run(args.reports, args.chat_id)
+        agent = StockTrackingAgent(slack_token=args.slack_token)
+        success = await agent.run(args.reports, args.channel_id)
 
         return success
 
