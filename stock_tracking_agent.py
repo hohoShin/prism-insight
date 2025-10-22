@@ -107,6 +107,34 @@ class StockTrackingAgent:
             - 매도: 1슬롯 보유분 100% 전량 매도
             - 올인/올아웃 방식이므로 더욱 신중한 판단 필요
             
+            ### ⚠️ 리스크 관리 최우선 원칙 (손실은 짧게!)
+
+            **손절가 설정 철칙:**
+            - 손절가는 매수가 기준 **-5% ~ -7% 이내** 우선 적용
+            - 손절가 도달 시 **원칙적으로 즉시 전량 매도** (매도 에이전트가 판단)
+            - **예외 허용**: 당일 강한 반등 + 거래량 급증 시 1일 유예 가능 (단, 손실 -7% 미만일 때만)
+            
+            **Risk/Reward Ratio 필수:**
+            - 목표 수익률이 10%면 → 손절은 최대 -5%
+            - 목표 수익률이 15%면 → 손절은 최대 -7%
+            - **손절폭은 원칙적으로 -7%를 넘지 않도록 설정**
+            
+            **지지선이 -7% 밖에 있는 경우:**
+            - **우선 선택**: 진입을 재검토하거나 점수를 하향 조정
+            - **차선 선택**: 지지선을 손절가로 하되, 다음 조건 충족 필수:
+              * Risk/Reward Ratio 2:1 이상 확보 (목표가를 더 높게)
+              * 지지선의 강력함을 명확히 확인 (박스권 하단, 장기 이평선 등)
+              * 손절폭이 -10%를 초과하지 않도록 제한
+            
+            **100% 올인/올아웃의 위험성:**
+            - 한 번의 큰 손실(-15%)은 복구에 +17.6% 필요
+            - 작은 손실(-5%)은 복구에 +5.3%만 필요
+            - 따라서 **손절이 멀면 진입하지 않는 게 낫다**
+            
+            **예시:**
+            - 매수가 18,000원, 지지선 15,500원 → 손실폭 -13.9% (❌ 진입 부적합)
+            - 이 경우: 진입을 포기하거나, 목표가를 30,000원 이상(+67%)으로 상향
+            
             ## 분석 프로세스
             
             ### 1. 포트폴리오 현황 분석
@@ -149,7 +177,8 @@ class StockTrackingAgent:
             다음 신호 확인 시 매수 점수 가산:
             - 거래량 급증 (관심 상승)
             - 기관/외국인 순매수 (자금 유입)
-            - 기술적 돌파 (추세 전환)
+            - 기술적 돌파1 (추세 전환)
+            - 기술적 돌파2 (박스권 상향 돌파)
             - 동종업계 대비 저평가
             - 업종 전반 긍정적 전망
             
@@ -171,6 +200,25 @@ class StockTrackingAgent:
             - '기술적 분석': 주가, 목표가, 손절가 정보
             
             ## JSON 응답 형식
+            
+            **중요**: key_levels의 가격 필드는 반드시 다음 형식 중 하나로 작성하세요:
+            - 단일 숫자: 1700 또는 "1700"
+            - 쉼표 포함: "1,700" 
+            - 범위 표현: "1700~1800" 또는 "1,700~1,800" (중간값 사용됨)
+            - ❌ 금지: "1,700원", "약 1,700원", "최소 1,700" 같은 설명 문구 포함
+            
+            **key_levels 예시**:
+            올바른 예시:
+            "primary_support": 1700
+            "primary_support": "1,700"
+            "primary_support": "1700~1750"
+            "secondary_resistance": "2,000~2,050"
+            
+            잘못된 예시 (파싱 실패 가능):
+            "primary_support": "약 1,700원"
+            "primary_support": "1,700원 부근"
+            "primary_support": "최소 1,700"
+            
             {
                 "portfolio_analysis": "현재 포트폴리오 상황 요약",
                 "valuation_analysis": "동종업계 밸류에이션 비교 결과",
@@ -178,8 +226,8 @@ class StockTrackingAgent:
                 "buy_score": 1~10 사이의 점수,
                 "min_score": 최소 진입 요구 점수,
                 "decision": "진입" 또는 "관망",
-                "target_price": 목표가 (원),
-                "stop_loss": 손절가 (원),
+                "target_price": 목표가 (원, 숫자만),
+                "stop_loss": 손절가 (원, 숫자만),
                 "investment_period": "단기" / "중기" / "장기",
                 "rationale": "핵심 투자 근거 (3줄 이내)",
                 "sector": "산업군/섹터",
@@ -191,7 +239,7 @@ class StockTrackingAgent:
                         "secondary_support": 보조 지지선,
                         "primary_resistance": 주요 저항선,
                         "secondary_resistance": 보조 저항선,
-                        "volume_baseline": "평소 거래량 기준"
+                        "volume_baseline": "평소 거래량 기준(문자열 표현 가능)"
                     },
                     "sell_triggers": [
                         "익절 조건 1:  목표가/저항선 관련",
@@ -588,6 +636,7 @@ class StockTrackingAgent:
 
             # JSON 파싱
             # todo : model을 만들어서 generate_structured 함수 호출하여 코드 유지보수성 증가
+            # todo : json 변환함수 utils로 이관하여 유지보수성 증가
             try:
                 # JSON 문자열 추출 함수
                 def fix_json_syntax(json_str):
@@ -760,6 +809,50 @@ class StockTrackingAgent:
             logger.error(traceback.format_exc())
             return {"success": False, "error": str(e)}
 
+    def _parse_price_value(self, value: Any) -> float:
+        """
+        가격 값을 파싱하여 숫자로 변환
+        
+        Args:
+            value: 가격 값 (숫자, 문자열, 범위 등)
+            
+        Returns:
+            float: 파싱된 가격 (실패 시 0)
+        """
+        try:
+            # 이미 숫자인 경우
+            if isinstance(value, (int, float)):
+                return float(value)
+            
+            # 문자열인 경우
+            if isinstance(value, str):
+                # 쉼표 제거
+                value = value.replace(',', '')
+                
+                # 범위 표현 체크 (예: "2000~2050", "1,700-1,800")
+                range_patterns = [
+                    r'(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)',  # 2000~2050 or 2000-2050
+                    r'(\d+(?:\.\d+)?)\s*~\s*(\d+(?:\.\d+)?)',     # 2000 ~ 2050
+                ]
+                
+                for pattern in range_patterns:
+                    match = re.search(pattern, value)
+                    if match:
+                        # 범위의 중간값 사용
+                        low = float(match.group(1))
+                        high = float(match.group(2))
+                        return (low + high) / 2
+                
+                # 단일 숫자 추출 시도
+                number_match = re.search(r'(\d+(?:\.\d+)?)', value)
+                if number_match:
+                    return float(number_match.group(1))
+            
+            return 0
+        except Exception as e:
+            logger.warning(f"가격 값 파싱 실패: {value} - {str(e)}")
+            return 0
+
     async def buy_stock(self, ticker: str, company_name: str, current_price: float, scenario: Dict[str, Any], rank_change_msg: str = "") -> bool:
         """
         주식 매수 처리
@@ -857,8 +950,8 @@ class StockTrackingAgent:
                     message += "💰 핵심 가격대:\n"
                     
                     # 저항선
-                    primary_resistance = key_levels.get('primary_resistance', 0)
-                    secondary_resistance = key_levels.get('secondary_resistance', 0)
+                    primary_resistance = self._parse_price_value(key_levels.get('primary_resistance', 0))
+                    secondary_resistance = self._parse_price_value(key_levels.get('secondary_resistance', 0))
                     if primary_resistance or secondary_resistance:
                         message += f"  📈 저항선:\n"
                         if secondary_resistance:
@@ -870,8 +963,8 @@ class StockTrackingAgent:
                     message += f"  ━━ 현재가: {current_price:,.0f}원 ━━\n"
                     
                     # 지지선
-                    primary_support = key_levels.get('primary_support', 0)
-                    secondary_support = key_levels.get('secondary_support', 0)
+                    primary_support = self._parse_price_value(key_levels.get('primary_support', 0))
+                    secondary_support = self._parse_price_value(key_levels.get('secondary_support', 0))
                     if primary_support or secondary_support:
                         message += f"  📉 지지선:\n"
                         if primary_support:
@@ -1267,14 +1360,14 @@ class StockTrackingAgent:
                     sector_counts[sector] = sector_counts.get(sector, 0) + 1
 
                     profit_rate = ((current_price - buy_price) / buy_price) * 100 if buy_price else 0
-                    arrow = "🔴" if profit_rate > 0 else "🔵" if profit_rate < 0 else "➖"
+                    arrow = "🔺" if profit_rate > 0 else "🔻" if profit_rate < 0 else "➖"
 
                     buy_datetime = datetime.strptime(buy_date, "%Y-%m-%d %H:%M:%S") if buy_date else datetime.now()
                     days_passed = (datetime.now() - buy_datetime).days
 
                     message += f"- {company_name}({ticker}) [{sector}]\n"
                     message += f"  매수가: {buy_price:,.0f}원 / 현재가: {current_price:,.0f}원\n"
-                    message += f"  수익률: {arrow} {abs(profit_rate):.2f}% / 보유기간: {days_passed}일\n\n"
+                    message += f"  수익률: {arrow} {profit_rate:.2f}% / 보유기간: {days_passed}일\n\n"
 
                 # 산업군 분포 추가
                 message += f"🔸 산업군 분포:\n"
