@@ -101,7 +101,7 @@ RUN mkdir -p /app/prism-insight/reports \
              /app/prism-insight/pdf_reports \
              /app/prism-insight/html_reports \
              /app/prism-insight/charts \
-             /app/prism-insight/telegram_messages/sent
+             /app/prism-insight/slack_messages/sent
 
 # 권한 설정
 RUN chmod -R 755 /app/prism-insight

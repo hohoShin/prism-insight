@@ -20,7 +20,7 @@ services:
       - ./pdf_reports:/app/prism-insight/pdf_reports
       - ./html_reports:/app/prism-insight/html_reports
       - ./charts:/app/prism-insight/charts
-      - ./telegram_messages:/app/prism-insight/telegram_messages
+      - ./slack_messages:/app/prism-insight/slack_messages
       
       # 설정 파일 (호스트에서 수정 가능)
       - ./.env:/app/prism-insight/.env

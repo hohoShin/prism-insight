@@ -6,6 +6,9 @@ mcp_agent.config.yaml
 mcp_agent.secrets.yaml
 config.py
 
+# Slack artifacts
+slack_messages/
+
 # IntelliJ IDEA project files
 .idea/
 

@@ -59,7 +59,7 @@ reports/
 pdf_reports/
 html_reports/
 charts/
-telegram_messages/sent/
+slack_messages/
 
 # Node.js
 node_modules/
