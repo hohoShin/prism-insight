@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-주식 분석 및 텔레그램 전송 오케스트레이터
+주식 분석 및 Slack 전송 오케스트레이터
 
 전체 프로세스:
 1. 시간대별(오전/오후) 트리거 배치 작업 실행
 2. 선정된 종목에 대한 상세 분석 보고서 생성
 3. 보고서 PDF 변환
-4. 텔레그램 채널 요약 메시지 생성 및 전송
+4. Slack 채널 요약 메시지 생성 및 전송
 5. 생성된 PDF 첨부파일 전송
 """
 import argparse
@@ -31,17 +31,17 @@ logger = logging.getLogger(__name__)
 
 # 환경 설정
 REPORTS_DIR = Path("reports")
-TELEGRAM_MSGS_DIR = Path("telegram_messages")
+SLACK_MSGS_DIR = Path("slack_messages")
 PDF_REPORTS_DIR = Path("pdf_reports")
 
 # 디렉토리 생성
 REPORTS_DIR.mkdir(exist_ok=True)
-TELEGRAM_MSGS_DIR.mkdir(exist_ok=True)
+SLACK_MSGS_DIR.mkdir(exist_ok=True)
 PDF_REPORTS_DIR.mkdir(exist_ok=True)
-(TELEGRAM_MSGS_DIR / "sent").mkdir(exist_ok=True)
+(SLACK_MSGS_DIR / "sent").mkdir(exist_ok=True)
 
 class StockAnalysisOrchestrator:
-    """주식 분석 및 텔레그램 전송 오케스트레이터"""
+    """주식 분석 및 Slack 전송 오케스트레이터"""
 
     def __init__(self):
         """초기화"""
@@ -167,84 +167,84 @@ class StockAnalysisOrchestrator:
 
         return pdf_paths
 
-    async def generate_telegram_messages(self, report_pdf_paths):
+    async def generate_slack_messages(self, report_pdf_paths):
         """
-        텔레그램 메시지 생성
+        Slack 메시지 생성
 
         Args:
             report_pdf_paths (list): 보고서 파일(pdf) 경로 리스트
 
         Returns:
-            list: 생성된 텔레그램 메시지 파일 경로 리스트
+            list: 생성된 Slack 메시지 파일 경로 리스트
         """
-        logger.info(f"{len(report_pdf_paths)}개 보고서 텔레그램 메시지 생성 시작")
+        logger.info(f"{len(report_pdf_paths)}개 보고서 Slack 메시지 생성 시작")
 
-        # 텔레그램 요약 생성기 모듈 임포트
-        from telegram_summary_agent import TelegramSummaryGenerator
+        # Slack 요약 생성기 모듈 임포트
+        from slack_summary_agent import SlackSummaryGenerator
 
         # 요약 생성기 초기화
-        generator = TelegramSummaryGenerator()
+        generator = SlackSummaryGenerator()
 
         message_paths = []
         for report_pdf_path in report_pdf_paths:
             try:
-                # 텔레그램 메시지 생성
-                await generator.process_report(str(report_pdf_path), str(TELEGRAM_MSGS_DIR))
+                # Slack 메시지 생성
+                await generator.process_report(str(report_pdf_path), str(SLACK_MSGS_DIR))
 
                 # 생성된 메시지 파일 경로 추정
                 report_file = Path(report_pdf_path)
                 ticker = report_file.stem.split('_')[0]
                 company_name = report_file.stem.split('_')[1]
 
-                message_path = TELEGRAM_MSGS_DIR / f"{ticker}_{company_name}_telegram.txt"
+                message_path = SLACK_MSGS_DIR / f"{ticker}_{company_name}_slack.txt"
 
                 if message_path.exists():
-                    logger.info(f"텔레그램 메시지 생성 완료: {message_path}")
+                    logger.info(f"Slack 메시지 생성 완료: {message_path}")
                     message_paths.append(message_path)
                 else:
-                    logger.warning(f"텔레그램 메시지 파일이 예상 경로에 없습니다: {message_path}")
+                    logger.warning(f"Slack 메시지 파일이 예상 경로에 없습니다: {message_path}")
 
             except Exception as e:
-                logger.error(f"{report_pdf_path} 텔레그램 메시지 생성 중 오류: {str(e)}")
+                logger.error(f"{report_pdf_path} Slack 메시지 생성 중 오류: {str(e)}")
 
         return message_paths
 
-    async def send_telegram_messages(self, message_paths, pdf_paths):
+    async def send_slack_messages(self, message_paths, pdf_paths):
         """
-        텔레그램 메시지 및 PDF 파일 전송
+        Slack 메시지 및 PDF 파일 전송
 
         Args:
-            message_paths (list): 텔레그램 메시지 파일 경로 리스트
+            message_paths (list): Slack 메시지 파일 경로 리스트
             pdf_paths (list): PDF 파일 경로 리스트
         """
-        logger.info(f"{len(message_paths)}개 텔레그램 메시지 전송 시작")
+        logger.info(f"{len(message_paths)}개 Slack 메시지 전송 시작")
 
         # 환경 변수에서 채널 ID 가져오기
         from dotenv import load_dotenv
         load_dotenv()
 
-        chat_id = os.getenv("TELEGRAM_CHANNEL_ID")
-        if not chat_id:
-            logger.error("텔레그램 채널 ID가 설정되지 않았습니다.")
+        channel_id = os.getenv("SLACK_CHANNEL_ID")
+        if not channel_id:
+            logger.error("Slack 채널 ID가 설정되지 않았습니다.")
             return
 
-        # 텔레그램 봇 에이전트 초기화
-        from telegram_bot_agent import TelegramBotAgent
+        # Slack 봇 에이전트 초기화
+        from slack_bot_agent import SlackBotAgent
 
         try:
-            bot_agent = TelegramBotAgent()
+            bot_agent = SlackBotAgent()
 
             # 메시지 전송
             await bot_agent.process_messages_directory(
-                str(TELEGRAM_MSGS_DIR),
-                chat_id,
-                str(TELEGRAM_MSGS_DIR / "sent")
+                str(SLACK_MSGS_DIR),
+                channel_id,
+                str(SLACK_MSGS_DIR / "sent")
             )
 
             # PDF 파일 전송
             for pdf_path in pdf_paths:
                 logger.info(f"PDF 파일 전송: {pdf_path}")
-                success = await bot_agent.send_document(chat_id, str(pdf_path))
+                success = await bot_agent.send_document(channel_id, str(pdf_path))
                 if success:
                     logger.info(f"PDF 파일 전송 성공: {pdf_path}")
                 else:
@@ -254,11 +254,11 @@ class StockAnalysisOrchestrator:
                 await asyncio.sleep(1)
 
         except Exception as e:
-            logger.error(f"텔레그램 메시지 전송 중 오류: {str(e)}")
+            logger.error(f"Slack 메시지 전송 중 오류: {str(e)}")
 
     async def send_trigger_alert(self, mode, trigger_results_file):
         """
-        트리거 실행 결과 정보를 텔레그램 채널로 즉시 전송
+        트리거 실행 결과 정보를 Slack 채널로 즉시 전송
         """
         logger.info(f"프리즘 시그널 얼럿 전송 시작 - 모드: {mode}")
 
@@ -282,26 +282,26 @@ class StockAnalysisOrchestrator:
                 logger.warning(f"트리거 결과가 없습니다.")
                 return False
 
-            # 텔레그램 메시지 생성
+            # Slack 메시지 생성
             message = self._create_trigger_alert_message(mode, all_results, trade_date)
 
             # 환경 변수에서 채널 ID 가져오기
             from dotenv import load_dotenv
             load_dotenv()
 
-            chat_id = os.getenv("TELEGRAM_CHANNEL_ID")
-            if not chat_id:
-                logger.error("텔레그램 채널 ID가 설정되지 않았습니다.")
+            channel_id = os.getenv("SLACK_CHANNEL_ID")
+            if not channel_id:
+                logger.error("Slack 채널 ID가 설정되지 않았습니다.")
                 return False
 
-            # 텔레그램 봇 에이전트 초기화
-            from telegram_bot_agent import TelegramBotAgent
+            # Slack 봇 에이전트 초기화
+            from slack_bot_agent import SlackBotAgent
 
             try:
-                bot_agent = TelegramBotAgent()
+                bot_agent = SlackBotAgent()
 
                 # 메시지 전송
-                success = await bot_agent.send_message(chat_id, message)
+                success = await bot_agent.send_message(channel_id, message)
 
                 if success:
                     logger.info("프리즘 시그널 얼럿 전송 성공")
@@ -311,7 +311,7 @@ class StockAnalysisOrchestrator:
                     return False
 
             except Exception as e:
-                logger.error(f"텔레그램 봇 초기화 또는 메시지 전송 중 오류: {str(e)}")
+                logger.error(f"Slack 봇 초기화 또는 메시지 전송 중 오류: {str(e)}")
                 return False
 
         except Exception as e:
@@ -320,7 +320,7 @@ class StockAnalysisOrchestrator:
 
     def _create_trigger_alert_message(self, mode, results, trade_date):
         """
-        트리거 결과를 기반으로 텔레그램 알림 메시지 생성
+        트리거 결과를 기반으로 Slack 알림 메시지 생성
         """
         # 날짜 포맷 변환
         formatted_date = f"{trade_date[:4]}.{trade_date[4:6]}.{trade_date[6:8]}"
@@ -422,7 +422,7 @@ class StockAnalysisOrchestrator:
                 logger.warning("선정된 종목이 없습니다. 프로세스 종료.")
                 return
 
-            # 1-1. 트리거 결과를 텔레그램으로 즉시 전송
+            # 1-1. 트리거 결과를 Slack으로 즉시 전송
             if os.path.exists(results_file):
                 logger.info(f"트리거 결과 파일 확인됨: {results_file}")
                 alert_sent = await self.send_trigger_alert(mode, results_file)
@@ -442,11 +442,11 @@ class StockAnalysisOrchestrator:
             # 3. PDF 변환
             pdf_paths = await self.convert_to_pdf(report_paths)
 
-            # 4. 텔레그램 메시지 생성
-            message_paths = await self.generate_telegram_messages(pdf_paths)
+            # 4. Slack 메시지 생성
+            message_paths = await self.generate_slack_messages(pdf_paths)
 
-            # 5. 텔레그램 메시지 및 PDF 전송
-            await self.send_telegram_messages(message_paths, pdf_paths)
+            # 5. Slack 메시지 및 PDF 전송
+            await self.send_slack_messages(message_paths, pdf_paths)
 
             # 6. 트랙킹 시스템 배치
             if pdf_paths:
@@ -461,23 +461,23 @@ class StockAnalysisOrchestrator:
                     from dotenv import load_dotenv
                     load_dotenv()
 
-                    chat_id = os.getenv("TELEGRAM_CHANNEL_ID")
-                    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+                    channel_id = os.getenv("SLACK_CHANNEL_ID")
+                    slack_token = os.getenv("SLACK_BOT_TOKEN")
 
-                    if not chat_id:
-                        logger.error("텔레그램 채널 ID가 설정되지 않았습니다.")
+                    if not channel_id:
+                        logger.error("Slack 채널 ID가 설정되지 않았습니다.")
                         return
 
-                    if not telegram_token:
-                        logger.warning("텔레그램 봇 토큰이 설정되지 않았습니다. 텔레그램 메시지 전송이 제한될 수 있습니다.")
+                    if not slack_token:
+                        logger.warning("Slack 봇 토큰이 설정되지 않았습니다. Slack 메시지 전송이 제한될 수 있습니다.")
 
                     # MCPApp 컨텍스트 매니저 사용
                     async with tracking_app.run():
-                        # 텔레그램 토큰과 함께 에이전트 초기화
-                        tracking_agent = StockTrackingAgent(telegram_token=telegram_token)
+                        # Slack 토큰과 함께 에이전트 초기화
+                        tracking_agent = StockTrackingAgent(slack_token=slack_token)
 
                         # 보고서 경로와 채널 ID 전달
-                        tracking_success = await tracking_agent.run(pdf_paths, chat_id)
+                        tracking_success = await tracking_agent.run(pdf_paths, channel_id)
 
                         if tracking_success:
                             logger.info("트래킹 시스템 배치 실행 완료")
@@ -559,7 +559,7 @@ async def main():
     """
     메인 함수 - 명령줄 인터페이스
     """
-    parser = argparse.ArgumentParser(description="주식 분석 및 텔레그램 전송 오케스트레이터")
+    parser = argparse.ArgumentParser(description="주식 분석 및 Slack 전송 오케스트레이터")
     parser.add_argument("--mode", choices=["morning", "afternoon", "both"], default="both",
                         help="실행 모드 (morning, afternoon, both)")
 
