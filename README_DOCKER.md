@@ -1,6 +1,6 @@
 # 🐳 PRISM-INSIGHT Docker 설치 가이드
 
-Ubuntu 24.04 기반 AI 주식 분석 시스템을 Docker로 간편하게 실행하세요.
+Ubuntu 24.04 기반 AI 주식 분석 시스템을 Docker로 간편하게 실행하세요. 이 문서는 **PRISM-INSIGHT Slack 버전**의 Docker 배포 가이드입니다.
 
 ---
 
@@ -498,7 +498,6 @@ sudo chown -R $USER:$USER data reports pdf_reports
 ## 📞 지원
 
 - **프로젝트**: https://github.com/dragon1086/prism-insight
-- **Slack**: https://prism-insight.slack.com/archives/C01MARKETAI
 - **이슈**: https://github.com/dragon1086/prism-insight/issues
 
 ---
