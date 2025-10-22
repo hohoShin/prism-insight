@@ -186,7 +186,7 @@ $LOG_CLEANUP_TIME * * * chmod +x $PROJECT_DIR/utils/cleanup_logs.sh && $PROJECT_
 # -----------------------------------------------------------------------------
 
 # 매일 오후 6시에 포트폴리오 리포트 생성 (월-금)
-# $PORTFOLIO_REPORT_TIME * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH trading/portfolio_telegram_reporter.py --type full >> $LOG_DIR/portfolio_report_\$(date +\%Y\%m\%d).log 2>&1
+# $PORTFOLIO_REPORT_TIME * * 1-5 cd $PROJECT_DIR && $PYTHON_PATH trading/portfolio_slack_reporter.py --type full >> $LOG_DIR/portfolio_report_\$(date +\%Y\%m\%d).log 2>&1
 
 # =============================================================================
 # 추가 스케줄 예시 (필요에 따라 주석 해제하여 사용)
